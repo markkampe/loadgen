@@ -1,0 +1,308 @@
+.\" Process this file with
+.\" groff -man -Tascii loadgen.1
+.\.
+.TH loadgen 1 04/15/11 HDS "Picasso Testing Tools"
+
+.SH NAME loadgen \- file read/write load generation
+
+.SH SYNOPSIS
+.B loadgen 
+.BI [--tag= string ]
+.BI [--target= directory [ , directory ... ] ]
+.BI [--source= directory ]
+.BI [--bsize= # ]
+.BI [--direct= # ]
+.BI [--length= # ]
+.BI [--maxfiles= # ]
+.BI [--threads= # ]
+.BI [--rate= # ]
+.BI [--random= # ]
+.BI [--update= # ]
+.B [--verify [--delete]]
+.B [--onceonly]
+.B [--halt]
+.B [--sync]
+.B [--rewrite]
+
+.SH DESCRIPTION
+.B loadgen
+is a stress- and performance-testing tool to generate read/write traffic 
+(at a controllable rate), verify correctness, and report (continuously)
+on the achieved instantaneous throughput.   Each instance of
+.B loadgen
+manages a controllable number of load generation threads.  It must be
+recognized that the load generatable by a single client machine
+is limited by its NIC (no matter how many threads are trying to generate
+load at what-ever rate).  Generating large loads requires large numbers
+of client machines (many 
+.B loadgen
+instances).  For this reason
+.B loadgen
+is designed to have many instances concurrently running under 
+the control of scripts or a
+.B ZombieMaster
+control console.
+
+.SS Basic Operating modes
+.B loadgen
+has two means of generating file write operations(
+.I pattern data creation
+and
+.I file copying.
+Regardless of the source of the data, 
+.B loadgen
+will attempt to write data to a specified target (host/directory).
+It can also be told to read back (and verify) that data 
+(against the expected patterns or the original files).  
+Whether reading or writing, it will attempt to consume (or generate)
+data at a specified rate, and regularly report on recent throughput
+(number of active threads, number of seconds in the reporting period,
+total number of bytes processed, and the computed aggregate throughput).
+.SS Scripted Operation
+The Simplest operating mode (suitable for scripted operation) is to merely 
+specify all of the load generation parameters on the command line.  
+.B loadgen
+will then create the specified number of threads and set them to work
+until a specified number of files have been created, or it is told
+(via a command on its standard input) to stop.  This is the mode
+most likely to be used for normal load and stress testing, and it
+requires some remote execution tool (e.g. 
+.B ssh 
+or 
+.BR STAF )
+to manage the 
+.B
+loadgen
+instances.
+
+.SS Console Driven Operation
+.B loadgen
+can also be used in a more interactive mode, typically under the 
+control of a scenario orchestration tool (like the
+.B ZombieMaster
+control console).  
+In this mode, 
+.B loadgen
+is configured as an 
+.B xinetd
+client, and instances are created (on demand) by connecting to the
+associated port on each client machine (turning it into a zombie
+in a DDoS attack).  The parameters (for each instance) can be entered
+(in the same format as on the command line) via standard input, and 
+reports will be generated to standard output.
+.PP
+This mode is better suited to demos or performance analysis, where
+highly variable loads are desired.
+.SS Interactive Control
+While it is running, each
+.B loagen
+instance continuously polls its standard input for session control commands:
+.IP #
+If a number is entered, 
+.B loadgen
+will shut-down existing threads or start-up new ones to match the
+requested number of load-generation threads.  Threads do not shut
+down until they complete writing (or verifying) the current file.
+.IP x
+If an
+.B 'x'
+is entered,
+.B loadgen will shut each of its threads down (as soon as it completes
+processing the current file), and then exit.
+.SH OPTIONS
+.IP --source=
+If data is to be copied from (or compared with) an original source, 
+the containing directory can be specified with the
+.B source
+parameter.  The specified directory should be local to the machine on
+which 
+.B loadgen 
+is running (to avoid the measurment artificat of obtaining that data
+from another system) and contain sub-directories 
+full of files to be copied (or verified).
+.B loadgen
+will start one thread (up to the number requested) in each of these
+sub-directories to copy (or compare) each file.  If the files in a
+directory are exhausted, the associated thread will exit, and a 
+new thread (operating in another sub-directory) will be started.
+If no
+.B input
+directory is specified, 
+.B loadgen
+will operate with pattern-data.
+.IP --target=
+This parameter specifies the directory (or directories) under  which new files should be
+created (or existing files verified).  
+In pattern data creation mode, if a single directory is specified,
+.B loadgen
+will create per-thread sub-directories to receive the new files.
+If multiple directories are specified, 
+.B loadgen
+will create a thread for each of them.   Explicitly specifying multiple
+directories is useful for measuring the aggregate throughput achievable 
+to multiple heads or servers.
+In verification mode
+.B loadgen
+will start up one thread (up to the number requested) in each
+directory to verify its contents.  If the files in a
+directory are exhausted, the associated thread will exit, and a 
+new thread (operating in another sub-directory) will be started.
+.IP
+What ever target directory is specified, it and the directories
+and files under it will be accessed with normal POSIX system 
+calls.  If you want to create or verify files on a remote server
+you must either specify a
+.B /net/host/vfs/subdir
+name or explicity 
+.I NFS mount
+the desired host/vfs/directory, and then specify the local mount point
+as the
+.B --target
+argument.
+.IP --bsize=
+This sets the block size to be used for all file read and write operations.
+This number can be specified in bytes, or followed by a 'k' suffix (to
+multiply by 1024).   If no 
+.B bsize
+is specified, 
+.B loadgen
+will randomly select a different block size for each file.
+.IP --direct=
+This enables 
+.B O_DIRECT
+I/O and specifies the associated I/O buffer alignment (e.g. 8K).
+.IP --halt
+Normally an error in one thread only terminates that thread, and a 
+new one will be started to take its place.  If the 
+.B halt
+option is specified, an error in any thread will cause the entire
+.B loadgen
+instance to promptly ( and cleanly) shut down and exit with an 
+error message and a non-zero return code.
+.IP --length=
+This switch sets the desired length of each file to be created.
+The number can be specified in bytes, or followed by a 'k', 'm', 'g', or 't',
+and should be a power of two (making it an even multiple of the block size).
+If no
+.B length
+is specified, 
+.B loadgen
+will randomly select a different length for each file.
+.IP --maxfiles=
+Normally, in pattern data creation mode, 
+.B loadgen
+will create new files until it is shut down.  This switch can be used
+to set the maximum number of files to be created by each thread, and 
+file threads will exit after completing this number of files.
+.IP --rate=
+In situations where you would like (each individual thread) to generate
+data at less-than-wire-speed, this switch can be used to specify the
+maximum desired (per-thread) read/write rate.  After each read or 
+write operation threads will (if necessary) sleep long enough to bring
+their throughput down to the specified rate.
+The number can be specified in bytes/second, or followed by a 'k', 'm', 'g'.
+.IP --tag=
+The periodic throughput reports include a 
+.B tag
+field that can be used to distinguish output from different 
+load generation client systems.  This switch specifies the
+.B tag
+value to be used in reports from this 
+.B loadgen
+instance.
+.IP --random=
+This parameter can be used (with
+.B verify 
+and 
+.BR rewrite )
+to request that the reads and rewrites be done at random rather than
+sequentially.  The specified value is the size of the blocks that will
+be read or rewritten, and the 
+.B --length
+parameter specifies the total number of bytes to be read or re-written.
+.IP --threads=
+This switch sets the (initial) number of concurrent threads that will be asked
+to generate read/write traffic.  In interactive use, this number can be
+changed during the course of the run.
+.IP 
+Note that if threads are running at large block
+size and maximum rates, it will probably be possible to saturate the 
+local NIC with only two or three threads.  
+.IP --update=
+This switch controls the number of seconds between throughput report messages.
+The default value is one report every five seconds.
+.IP --verify
+This switch will cause 
+.B loadgen 
+to read (and verify) the contents of files rather than create new files.
+If the
+.B --delete
+switch is specified, files (and sub-directories) will be deleted 
+after they are (successfully) verified.
+.IP --rewrite
+If this switch is specified the output files are assumed to exist and
+are re-written rather than being truncated and recreated (which may
+eliminate overhead associated with new block allocation).
+.IP --sync
+If this switch is specified output files are created w/O_SYNC so that
+each write is flushed out as it is performed.
+.IP --onceonly
+Ordinarily when told to read/verify the contents of a directory, 
+.B loadgen
+will process every file in that directory.  There are situations where
+we would like each thread to process exactly one file ... no matter
+how many files or directories there are.  
+.SH EXIT STATUS
+.IP 0
+All requested operations completed successfully.
+.IP non-zero
+Something went wrong, descriptive error messages will be sent to standard error.
+
+.SH DIAGNOSTICS
+.IP Yes\ Master?
+If 
+.B loadgen
+is started without any parameters, it will issue this prompt and await
+parameters on standard input.
+.IP Yes\ Master!
+After successfully processing parameters from standard input, 
+.B loadgen
+will output this acknowledgement.
+.IP Yes\ Master.
+When it shuts down cleanly
+.B loadgen
+prints out this final message.
+.IP Arg\ Master.
+When 
+.B loadgen
+shuts down due to an error, it prints out a line with this,
+followed by a brief description of the problem.
+.IP "Progress Reports"
+The most interesting output from a
+.B loadgen
+instance is its regular status/throughput reports, which come in two basic forms:
+.sp
+.RS
+.nf
+REPORT date=04/01/2011 time=01:02:03 tag=mytag threads=6 bytes=10240 seconds=5 rate=2048
+REPORT date=04/01/2011 time=01:02:08 tag=mytag threads=0
+.fi
+.RE
+.IP
+The first (most common) form indicates how many threads have been running, how
+long it has been since the last report, and the computed bytes per second for
+this reporting interval.  The second reports that no threads are currently
+running (either because none have been started or all have completed).  These
+latter messages are only heart-beats.
+.PP
+Other diagnostic output may be sent to standard out or standard error.
+Most of these messages are prefixed with a comment character
+.B (#)
+and intended for human eyes.
+
+.SH BUGS
+
+.SH AUTHOR
+Mark Kampe
+.SH SEE ALSO
+ZombieMaster.1

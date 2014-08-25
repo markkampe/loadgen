@@ -1,0 +1,168 @@
+.\" Process this file with
+.\" groff -man -Tascii ZombieMaster.1
+.\.
+.TH ZombieMaster 1 "PCS Testing Tools"
+.SH NAME ZombieMaster \- A graphical control panel for load generators
+.SH SYNOPSIS
+.B java -jar ZombieMaster.jar 
+.B xxx
+.BI [--title= string ]
+.BI [--bsize= # ]
+.BI [--length= # ]
+.BI [--scale= # ]
+.BI [--rate= # ]
+.BI [--wire= file ]
+.BI [--update= # ]
+.BI [--zombies= # ]
+.B  [ --DEBUG ]
+.BI [ scenario-file ]
+.SH DESCRIPTION
+.B ZombieMaster
+is a GUI control panel for a configurable number of
+.B loadgen
+load generation zombies.
+With it, one can set the parameters of a load generation run (operational
+mode, maximum desired per-thread throughput, block size, maximum file
+size), adjust the number of load generation threads
+run by each load generation zombie, and display the current (and recorded)
+aggregate throughput.
+.P
+Any of the parameters can be adjusted until the
+.B START
+button is pressed.
+.P
+When the
+.B STOP
+button is pressed, all zombies will be instructed to shut down after
+completing the current file, but the control panel will remain
+on the screen so that you can view the throughput and status results.
+.P
+Clicking the window exit button will shut down all running zombies
+(if they have not yet already shut down) and will only dismiss the
+window after all have reported termination.
+.SH OPTIONS
+.IP --title=
+This sets the title bar for the
+.B ZombieMaster
+GUI window.
+.IP --bsize=
+This switch sets the default block size to be used.
+The number can be followed by an optional 'k'.
+This is only a default value, and can be changed from the GUI console.
+.IP --length=
+This switch sets the default file length to be created.
+The number can be followed by an optional 'k', 'm', or 'g'.
+This is only a default value, and can be changed from the GUI console.
+.IP --rate=
+This switch sets the desired the per-zombie throughput, which
+will be passed as a
+.B --rate
+parameter to each zombie.  This also (by implication) sets the
+.B --wire
+parameter (to the same value).
+It is in bytes per second, and can be followed by an optional 'k', 'm', or 'g'.  
+This is only a default value, and can be changed from the GUI console.
+.IP --scale=
+This switch scales the aggregate throughput plot (by setting the
+full-scale value).  
+It is in bytes per second, and can be followed by an optional 'k', 'm', or 'g'.  
+This also (by implication) sets the
+.B --wire
+parameter to
+.I 1/n 
+of this number (where 
+.I n 
+is the number of configured zombies).
+.IP --wire=
+This switch scales the per-zombie throughput bar (by setting the
+full-scale value).  
+It is in bytes per second, and can be followed by an optional 'k', 'm', or 'g'.  
+.IP --zombies=
+For local testing (where no scenario file is requred) this option
+specifies the number of local 
+.B loadgen
+zombie instances to be started.
+.IP --update=
+Set the number of seconds between throughput/status refreshes.
+This parameter will also be passed on to
+.B loadgen
+for the frequency of status updates.
+.IP --DEBUG
+This switch causes all messages sent to and received from each of the
+load generation zombies to be displayed to standard output.  Capturing
+these will create a very complete log of the load generation session.
+.SH DIAGNOSTICS
+The primary status information is the color of the zombie status indicators:
+.IP green
+This zombie has responded in the affirmative to all requests and is sending
+regular throughput reports.
+.IP grey
+This zombie has completed all of its work and exited normally.
+.IP red
+This zombie has reported a fatal error, and has stopped.
+.IP yellow
+This zombie seems to be running, but is currently achieving zero throughput
+(probably because the requests are being held up at the server).
+.IP blank
+This zombie has not yet acknowledged the most recent command or has missed
+a few throughput reports.
+.SH ENVIRONMENT
+.IP LOAD_ZOMBIE_HORDE
+If no scenario configuration file has been specified, this environment
+variable is consulted to find the name of a default scenario configuration
+file.
+.SH FILES
+The 
+.B ZombieMaster
+console provides control over general run parameters, but there is
+a non-trivial amount of per-zombie configuration that must be 
+supplied from a scenario configuration file.  
+.P
+.RS
+.nf
+#
+# sample zombie horde configuration file
+#
+PARM	title="QA3 Physical Cloud"
+PARM	bsize=16k
+PARM	scale=600M
+PARM	wire=100M
+PARM	DEBUG
+
+ZOMBIE	tag=z1	zombie=qa3-cl1  ... loadgen parameters ...
+ZOMBIE	tag=z2	zombie=qa3-cl3  ... loadgen parameters ...
+ZOMBIE	tag=z3	zombie=qa3-cl4  ... loadgen parameters ...
+ZOMBIE	tag=z4	zombie=qa3-cl5  ... loadgen parameters ...
+ZOMBIE	tag=z5	zombie=qa3-cl7  ... loadgen parameters ...
+ZOMBIE	tag=z6	zombie=qa3-cl8  ... loadgen parameters ...
+.fi
+.RE
+.IP PARM
+A line that beigns with 
+.B PARM
+can contain any option that would be accepted on the command line.
+Any option that is not recognized will be passed (prefixed with 
+.BR -- )
+on to all of the loadgen instances
+.IP ZOMBIE
+A line that begins with
+.B ZOMBIE
+contains parameters that will be passed to the
+.B loadgen
+instance ... with the exception of the
+.B zombie
+and
+.B port
+parameters, which define the IP address and port to be used to create this zombie instance.
+The 
+.B tag
+will be passed to the 
+.B loadgen
+instance, but will also be used to label the status of this zombie on the
+.B ZombieMaster 
+GUI control panel.
+.SH BUGS
+.SH AUTHOR
+Mark Kampe
+.SH SEE ALSO
+loadgen.1
