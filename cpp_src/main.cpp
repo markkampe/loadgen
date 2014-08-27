@@ -330,7 +330,7 @@ main( int argc, const char **argv) {
 		fprintf(stderr, "#   rewrite  = %s\n", loadgen_rewrite ? "true" : "false" );
 		fprintf(stderr, "#   verify   = %s\n", loadgen_verify ? "true" : "false" );
 		if (loadgen_rand_blk)
-			fprintf(stderr, "#   random    = %d\n", loadgen_rand_blk );
+			fprintf(stderr, "#   random   = %d\n", loadgen_rand_blk );
 		fprintf(stderr, "#   direct   = %d\n", loadgen_direct );
 		fprintf(stderr, "#   delete   = %s\n", loadgen_delete ? "true" : "false" );
 		fprintf(stderr, "#   sync     = %s\n", loadgen_sync ? "true" : "false" );

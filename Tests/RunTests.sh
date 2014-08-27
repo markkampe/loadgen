@@ -218,7 +218,7 @@ do
 	if [ -f dirs.$test ]
 	then
 		DIRS=`cat dirs.$test`
-		( cd $TESTDIR; ls -Rs $DIRS > ls.$test )
+		( cd $TESTDIR; ls -Rs $DIRS > ls.$test 2> /dev/null)
 		if ! diff ls.$test $TESTDIR/ls.$test
 		then
 			echo test $test: directory listing mismatch

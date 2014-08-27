@@ -303,6 +303,18 @@ void *readThread( void *sts ) {
 		status = readFile( myparms->to_directory, data, bsize, 
 				myparms->block_size, myparms->length, myparms->offset,
 				&mystatus->stats );
+		if (status == 0 && loadgen_delete) {
+			if (unlink( myparms->to_directory ) != 0) {
+				fprintf(stderr,
+					"Unable to delete file %s: %s\n",
+					myparms->to_directory, strerror( errno ) );
+				status |= INPUT_FILE_ERROR;
+				loadgen_problem = "file deletion error";
+			} else if (loadgen_debug & D_FILES) {
+				fprintf(stderr, "# Delete file %s ... OK\n", 
+					myparms->to_directory );
+			}
+		}
 	} else 
 		count = scandir(  myparms->to_directory, &results, isFile, alphasort );
 
@@ -330,7 +342,10 @@ void *readThread( void *sts ) {
 				} else if (loadgen_debug & D_FILES) {
 					fprintf(stderr, "# Delete file %s ... OK\n", path );
 				}
-			}
+			} 
+		} else {
+			fprintf(stderr, "# %s of %s completed w/status=%d\n",
+				loadgen_verify ? "verify" : "read", path, status);
 		}
 		
 		// free the stuff we allocated for this file
@@ -348,7 +363,7 @@ void *readThread( void *sts ) {
 	if (results)
 		free( results );
 	
-	if (status == 0 && loadgen_delete) {
+	if (status == 0 && loadgen_delete && !myparms->one_file) {
 		if (rmdir( myparms->to_directory ) != 0) {
 			fprintf(stderr,
 				"Unable to remove directory %s: %s\n",

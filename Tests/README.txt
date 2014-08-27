@@ -49,12 +49,27 @@ EXISTING TEST CASES:
 	verify that that the report contains well formatted and plausible data
 	
 7. Zombie mode parallel single file sequential pattern write
-	verify handling of existing file target and once-only
+	using parallel threads to sequentially write individual files
+	verify handling of existing file target (and once-only) data creation
 
 8. Zombie mode parallel single file sequential pattern verify
+	using parallel threads to sequentially verify individual files
+	verify handling of single file pattern verification (files created in 7)
 
+9. Zombie mode parallel single file random pattern write
+	using parallel threads to do random block writes to individual files
+	verify random rewrites (of files created in 7).
+
+10. Zombie mode parallel single file random pattern verify and delete
+	using parallel threads to verify random block reads 
+	verify random reads (of files created in 7 and 9) and single file deletes
 
 YET TO BE DONE
+
+    ADDITIONAL REPORT SANITY CHECKING
+    	rate ... non zero values should be 64K +/- 4K
+	report intervals ... should be one second apart
+	latency bucket counts should all be sub 100us
 
     EASY AND IMPORTANT
 	induced header verification errors
@@ -64,16 +79,13 @@ YET TO BE DONE
 	induced data comarison errors
 		pattern data creation and copy, followed by corruption of copy
 
-    HARD BUT IMPORTANT
-    	correctness of the reported latencies
-
     PROBABLY EASY BUT UNIMPORTANT
-	--halt		... obvious from the output
+    	induced target directory access errors
+	induced source directory access errors
+	induced input file open errors
+	induced file read errors
+	--halt
 
     UNSURE HOW TO TEST, MAYBE SOMEDAY
     	--direct	... it should be obvious from the performance results
 	--synchronous 	... it should be obvious form the performance results
-    	target directory access
-	source directory access
-	input file open errors
-	file read errors
