@@ -289,9 +289,10 @@ main( int argc, const char **argv) {
 	// make sure we know (at least) where to create our data
 	//	(having a default would surely be the wrong thing)
 	if (tgts == 0 || targets == 0) {
+		loadgen_problem = "No target specified";
 		if (loadgen_zombie)
-			fprintf(stdout, "%s No target specified!\n", argh);
-		fprintf(stderr, " No target directory specified\n");
+			fprintf(stdout, "%s %s!\n", argh, loadgen_problem);
+		fprintf(stderr, " %s\n", loadgen_problem);
 		exit( -1 );
 	}
 

@@ -269,7 +269,7 @@ void *readThread( void *sts ) {
 		bsize = max_bsize();
 
 	// announce that we are starting up
-	mystatus->running = true;
+	mystatus->running = true;	// now set in manageThreads to avoid a race
 	if (loadgen_debug & D_THREADS) {
 		fprintf(stderr, "# Starting %s in %s\n", mystatus->name, myparms->to_directory );
 	}

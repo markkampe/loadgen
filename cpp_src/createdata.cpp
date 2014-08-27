@@ -200,9 +200,10 @@ void *createDataThread( void *sts ) {
 	struct writeParms *myparms = (struct writeParms *) mystatus->parms;
 	long bsize = myparms->block_size;
 	int alignment = loadgen_direct > 0 ? loadgen_direct : DEFAULT_ALIGNMENT;
+	int maxfiles = loadgen_maxfiles;
 
 	// announce that we are starting up
-	mystatus->running = true;
+	mystatus->running = true;	// now set in manageThreads to avoid a race
 	if (loadgen_debug & D_THREADS) {
 		fprintf(stderr, "# Starting %s in %s\n", mystatus->name, myparms->to_directory );
 	}
@@ -218,7 +219,8 @@ void *createDataThread( void *sts ) {
 			loadgen_problem = "target directory access";
 			goto exit;
 		} 
-	}
+	} else
+		maxfiles = 1;
 
 	// allocate and lock down a pattern data buffer
 	if (bsize == 0)
@@ -244,7 +246,7 @@ void *createDataThread( void *sts ) {
 			break;
 
 		// see if we have hit the maximum # of files to create
-		if (loadgen_maxfiles > 0 && done >= loadgen_maxfiles)
+		if (maxfiles > 0 && done >= maxfiles)
 			break;
 
 		// come up with a block size
@@ -252,7 +254,7 @@ void *createDataThread( void *sts ) {
 		if (bsize == 0)
 			bsize = choose_bsize( loadgen_direct, myparms->file_length );
 
-		// figure out the name of the next file and create a file header
+		// figure out the name of the next file 
 		if (!myparms->single_file) {
 			char *fullpath;
 			char filename[16];
@@ -268,10 +270,9 @@ void *createDataThread( void *sts ) {
 			status = writeFile( fullpath, data, bsize, myparms, &mystatus->stats );
 			free( fullpath );
 			fullpath = 0;
-		} else
+		} else {
 			status = writeFile( myparms->to_directory, data, bsize, myparms, &mystatus->stats );
-
-
+		}
 	}
 
   	// free the pattern data buffer
@@ -284,7 +285,8 @@ void *createDataThread( void *sts ) {
 	// update my exit status and exit
 	mystatus->running = false;
 	mystatus->exit_status = status;
-	if (loadgen_debug & D_THREADS || done != loadgen_maxfiles) {
+	if (loadgen_debug & D_THREADS || done != maxfiles) {
+		// it is often useful to know what caused each thread to exit
 		fprintf(stderr, "# Shutting down %s (en=%d, cnt=%d/%d, sts=%x, stop=%d)\n",
 			mystatus->name, mystatus->enable,
 			done, loadgen_maxfiles, status, loadgen_shutdown );

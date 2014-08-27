@@ -311,6 +311,7 @@ void *copyThread( void *sts ) {
 	mystatus->running = false;
 	mystatus->exit_status = status;
 	if (loadgen_debug & D_THREADS || done != count) {
+		// it is often useful to know what caused a thread to shut down
 		fprintf(stderr, "# Shutting down %s (en=%d, cnt=%d/%d, sts=%x, stop=%d)\n",
 			mystatus->name, mystatus->enable,
 			done, count, status, loadgen_shutdown );

@@ -48,15 +48,20 @@ EXISTING TEST CASES:
 	program will verify correctness of the copies
 	verify that that the report contains well formatted and plausible data
 	
+7. Zombie mode parallel single file sequential pattern write
+	verify handling of existing file target and once-only
+
+8. Zombie mode parallel single file sequential pattern verify
+
 
 YET TO BE DONE
 
     EASY AND IMPORTANT
-	header verification errors
+	induced header verification errors
 		pattern data creation followed by sed corruption
-	data verification errors
+	induced data verification errors
 		pattern data creation followed by sed corruption
-	data comarison errors
+	induced data comarison errors
 		pattern data creation and copy, followed by corruption of copy
 
     HARD BUT IMPORTANT
@@ -64,13 +69,10 @@ YET TO BE DONE
 
     PROBABLY EASY BUT UNIMPORTANT
 	--halt		... obvious from the output
-	--onceonly	... obvious from the output
 
     UNSURE HOW TO TEST, MAYBE SOMEDAY
-	--rewrite	... it should be obvious from the output
     	--direct	... it should be obvious from the performance results
 	--synchronous 	... it should be obvious form the performance results
-	--random	... it should be obvious from the performance results
     	target directory access
 	source directory access
 	input file open errors
