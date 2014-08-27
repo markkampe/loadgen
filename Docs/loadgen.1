@@ -8,7 +8,7 @@
 .SH SYNOPSIS
 .B loadgen 
 .BI [--tag= string ]
-.BI [--target= directory [ , directory ... ] ]
+.BI [--target= directory/file [ , directory/file ... ] ]
 .BI [--source= directory ]
 .BI [--bsize= # ]
 .BI [--direct= # ]
@@ -130,7 +130,7 @@ If no
 directory is specified, 
 .B loadgen
 will operate with pattern-data.
-.IP --target=
+.IP --target=directory
 This parameter specifies the directory (or directories) under  which new files should be
 created (or existing files verified).  
 In pattern data creation mode, if a single directory is specified,
@@ -159,6 +159,15 @@ the desired host/vfs/directory, and then specify the local mount point
 as the
 .B --target
 argument.
+.IP --target=file
+If a filename (or list of filenames) is specified 
+.B
+loadgen
+will start one thread for each (existing) specified target file.  
+The thread will process that one file (for the specified length)
+and then exit. 
+This option is particularly useful for doing reads and writes to
+a block device.
 .IP --bsize=
 This sets the block size to be used for all file read and write operations.
 This number can be specified in bytes, or followed by a 'k' suffix (to
