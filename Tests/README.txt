@@ -36,9 +36,9 @@ EXISTING TEST CASES:
 	verify that that the report contains well formatted and plausible data
 	verify that that the report contains well formatted and plausible data
 
-5. Zombie mode parallel verify/delete data copies
-	use parallel threads to verify the copies made in test 4
-	verifying the handling of: verify, delete
+5. Zombie mode parallel compare/delete data copies
+	use parallel threads to compare copies made in test 4 with originals
+	verifying the handling of: compare, delete
 	program will verify correctness of the copies
 	verify that that the report contains well formatted and plausible data
 
