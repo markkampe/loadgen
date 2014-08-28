@@ -13,38 +13,39 @@ To turn an ordinary system into a loadzombie:
 
   (1) install the appropriate (32/64) loadgen in /usr/bin.
 
-  (2) configure the loadzombie network service:
-
-    CentOS
-	copy "loadzombie" to /etc/xinetd.d
-
-		This file sets up loadgen to serve port 8080.
-		I chose this because it is passed through our 
-		fire-walls and not used by our client systems.
-		You can choose any port you want.
+  (2) make sure that xinetd is installed
 
 	make sure that xinetd is running
 
-		# chkconfig --level 345 xinetd on
+	    # service --status-all
 
-	It may not yet be installed.  To install:
+	It may not yet be installed.
 
+	    CentOS:
 		# yum install xinetd
 		# chkconfig --level 345 xinetd on
+
+  	    Ubuntu:
+	    	# apt-get install xinetd
+
+  (3) configure the loadzombie network service:
+
+	edit "loadzombie" configuration file to choose a port.
+
+	copy "loadzombie" configuration file to /etc/xinetd.d
+
+		# cp loadzombie /etc/xinetd.d
+
+	tell xinetd to rescan
+	
 		# service xinetd restart
 
-	confirm that loadzombie is a registered service
-	
-		# chkconfig --list
-
-    Ubuntu
-
-  (3) test the loadzombie service:
+  (4) test the loadzombie service:
 
 	% telnet <node> <port>
 
-		for   <node> on which the service is configured
-		      <port> on which the service is configured
+		for   <node> on which the service is configured (local = 127.0.0.1)
+		      <port> on which the service is configured (default = 8081)
 
 		It should greet you with a loadzombie prompt.
 		If you enter 'x' followed by a newline, it 

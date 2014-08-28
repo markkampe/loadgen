@@ -1,0 +1,15 @@
+# default: off
+# description: load generation zombie ("Don't be evil!")
+#	choose some port that will work for your network
+#
+service loadzombie
+{
+	disable		= no
+	socket_type     = stream
+    	protocol        = tcp
+	wait            = no
+	user            = root
+	server          = /usr/bin/loadgen
+	port		= 8081
+    	type            = unlisted
+}
