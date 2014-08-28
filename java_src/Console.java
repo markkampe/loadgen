@@ -71,7 +71,8 @@ public class Console implements ActionListener, ChangeListener, ZombieListener {
 	//* options for write file size
 	private static final String fileSizes[] = 
 		{ "assorted", "64K", "128K", "256K", "512K", 
-		  "1M", "4M", "16M", "64M", "128M", "256M", "512M", "1G" };
+		  "1M", "4M", "16M", "64M", "128M", "256M", "512M", 
+		  "1G", "4G", "16G", "64G", "128G", "256G", "512G" };
 
 	/**
 	 * create a control panel for this horde this horde
@@ -133,7 +134,7 @@ public class Console implements ActionListener, ChangeListener, ZombieListener {
 		controls.add( bandwidthCombo );
 
 		// block size selector
-		controls.add( new JLabel("write (bytes)", JLabel.LEFT));
+		controls.add( new JLabel("bsize (bytes)", JLabel.LEFT));
 		blockSizeCombo = new JComboBox( blockSizes );
 		blockSizeCombo.setSelectedIndex(0);
 		controls.add( blockSizeCombo );
@@ -141,7 +142,7 @@ public class Console implements ActionListener, ChangeListener, ZombieListener {
 		// file size selector
 		fileSizeCombo = new JComboBox( fileSizes );
 		fileSizeCombo.setSelectedIndex(0);
-		controls.add( new JLabel("file (bytes)", JLabel.LEFT));
+		controls.add( new JLabel("length (bytes)", JLabel.LEFT));
 		controls.add( fileSizeCombo );
 
 		startButton = new JButton("START");
