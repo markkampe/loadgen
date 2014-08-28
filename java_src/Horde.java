@@ -7,7 +7,7 @@ public class Horde {
 	
 	// default zombie parameters
 	private static final String LOCAL_HOST = "127.0.0.1";
-	private static final int ZOMBIE_PORT = 8080;
+	private static final int ZOMBIE_PORT = 8081;
 
 	// strings in the zombie configuration file
 	private static final String COMMENT = "#";
