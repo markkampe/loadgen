@@ -40,6 +40,10 @@ on the screen so that you can view the throughput and status results.
 Clicking the window exit button will shut down all running zombies
 (if they have not yet already shut down) and will only dismiss the
 window after all have reported termination.
+.P
+The first parameter after the jar name is treated as the program name (argv[0]) 
+and is ignored ... but it must be present if other arguments (e.g. a scenario file
+name) are specified.
 .SH OPTIONS
 .IP --title=
 This sets the title bar for the
