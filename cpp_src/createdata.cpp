@@ -7,6 +7,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 
@@ -309,16 +311,23 @@ writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstat
 	if (bsize == 0) {
 		bsize = choose_bsize( loadgen_direct, max_bsize() );
 	}
+
 	// come up with a file length
-	long long fsize = myparms->file_length;
-	if (loadgen_rewrite) { // use the size with which it was created
+	unsigned long long fsize = myparms->file_length;
+	if (fsize == 0) {
 		struct stat statb;
 		fstat( fd, &statb );
-		if (S_ISREG(statb.st_mode) && statb.st_size > 0)
+		if (S_ISREG(statb.st_mode) && statb.st_size > 0) {
+			// existing file ... use current length
 			fsize = statb.st_size;
-	} else if (fsize == 0) {
-		fsize = choose_file_size( bsize );
+		} else if (S_ISBLK(statb.st_mode) || S_ISCHR(statb.st_mode)) {
+			ioctl(fd, BLKGETSIZE64, &fsize);
+		} 
 	}
+	if (fsize == 0)
+		fsize = choose_file_size( bsize );	// choose a random length
+
+	// now create a header for that size
 	fileHeader( buf, filename, fsize );
 		
 	// figure out how much data to write
@@ -328,7 +337,7 @@ writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstat
 
 	// announce our intentions
 	if (loadgen_debug & D_FILES) 
-		fprintf(stderr, "# %s output file %s, bsize=%d, length=%lld/%lld\n", 
+		fprintf(stderr, "# %s output file %s, bsize=%d, fsize=%lld/%lld\n", 
 			loadgen_rewrite ? "rewriting" : "creating",
 			filename, bsize, totbytes, fsize);
 
