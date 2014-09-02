@@ -1,2 +1,2 @@
---tag=test_tag --target=TESTDIR/seqfile1,TESTDIR/seqfile2,TESTDIR/seqfile3,TESTDIR/seqfile4 --verify --random=4k --bsize=4k --rate=16k --delete --update=1 --debug=OC
+--tag=test_tag --target=TESTDIR/seqfile1,TESTDIR/seqfile2,TESTDIR/seqfile3,TESTDIR/seqfile4 --verify --random=4k --bsize=4k --rate=16k --data=64k --delete --update=1 --debug=OC
 d
