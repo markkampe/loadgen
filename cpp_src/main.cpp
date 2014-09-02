@@ -111,7 +111,9 @@ bool loadgen_halt = false;	///< halt on error
 bool loadgen_sync = false;	///< synchronous writes
 bool loadgen_zombie = false;	///< under remote control
 bool loadgen_once = false;	///< only one directory per thread
+int  loadgen_bsize = 0;		///< read/write block size
 long long loadgen_rate = 0;	///< target write/read bandwidth
+long long loadgen_fsize = 0;	///< size of each created file
 long long loadgen_data = 0;	///< how much data to read or write
 int loadgen_update = 5;		///< statistics update interval in seconds
 int loadgen_maxfiles = 0;	///< maximum number of files to create
@@ -160,9 +162,7 @@ main( int argc, const char **argv) {
 	char  	   **tgts = 0;		// directories where we create/verify data
 	const char  *src = 0;		// directory from which we copy data
 	int         threads = 1;	// number of load generation threads
-	int	    bsize = 0;		// default write block size (random)
 	int 	    targets = 0;	// number of specified targets
-	long long   length = 0;		// default file size (random)
 
 	// figure out our system name
 	{	static struct utsname buf;
@@ -244,7 +244,7 @@ main( int argc, const char **argv) {
 			continue;
 
 		    case 'l':
-			length = getSizeSpec( optarg );
+			loadgen_fsize = getSizeSpec( optarg );
 			continue;
 
 		    case 'Z':
@@ -252,7 +252,7 @@ main( int argc, const char **argv) {
 			continue;
 
 		    case 'b':
-			bsize = (int) getSizeSpec( optarg );
+			loadgen_bsize = (int) getSizeSpec( optarg );
 			continue;
 
 		    case 'D':
@@ -321,15 +321,15 @@ main( int argc, const char **argv) {
 
 		if (src)
 			fprintf(stderr, "#   source   = %s\n", src );
-		else if (length)
-			fprintf(stderr, "#   length   = %lld bytes\n", length );
+		else if (loadgen_fsize)
+			fprintf(stderr, "#   length   = %lld bytes\n", loadgen_fsize );
 		else
 			fprintf(stderr, "#   length   = random\n");
 
 		if (loadgen_data)
 			fprintf(stderr, "#   data     = %lld bytes\n", loadgen_data );
-		if (bsize)
-			fprintf(stderr, "#   bsize    = %d bytes\n", bsize );
+		if (loadgen_bsize)
+			fprintf(stderr, "#   bsize    = %d bytes\n", loadgen_bsize );
 		else
 			fprintf(stderr, "#   bsize    = random\n");
 
@@ -377,17 +377,17 @@ main( int argc, const char **argv) {
 	int ret = 0;
 	if (loadgen_read) {
 		if (targets == 1 && checkdir( tgts[0], false) == 0)
-			ret = readData_d( src, tgts[0], threads, bsize, length );
+			ret = readData_d( src, tgts[0], threads );
 		else
-			ret = readData_l( tgts, bsize, length );
+			ret = readData_l( tgts );
 	} else {
 		if (src) {	// copy
-			ret = copyData( src, tgts[0], threads, bsize );
+			ret = copyData( src, tgts[0], threads );
 		} else {	// create
 			if (targets == 1)
-				ret = createData_d( tgts[0], threads, bsize, length );
+				ret = createData_d( tgts[0], threads );
 			else
-				ret = createData_l( tgts, bsize, length );
+				ret = createData_l( tgts );
 		}
 	}
 

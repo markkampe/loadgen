@@ -13,6 +13,8 @@ extern bool loadgen_zombie;	///< we are under remote control
 extern bool loadgen_once;	///< only one directory per thread
 extern int  loadgen_direct;	///< direct buffer alignment
 extern int  loadgen_rand_blk;	///< random access r/w block size
+extern int  loadgen_bsize;	///< read/write block size
+extern long long loadgen_fsize;	///< size of each created file
 extern long long loadgen_data;	///< amount of data to read or write
 extern long long loadgen_rate;	///< target generation rate
 extern int  loadgen_update;	///< performance update interval
@@ -20,11 +22,11 @@ extern int  loadgen_maxfiles;	///< maximum number of files to create
 extern const char *loadgen_tag;	///< output tag
 extern const char *loadgen_problem;	///< the problem that took us down
 
-extern int copyData( const char *from, char *to, int threads, int bsize );
-extern int createData_d( char *to, int threads, int bsize, long long file_size );
-extern int createData_l( char **list, int bsize, long long file_size );
-extern int readData_d( const char *from, char *to_dir, int threads, int bsize, long long length );
-extern int readData_l( char **list, int bsize, long long length );
+extern int copyData( const char *from, char *to, int threads );
+extern int createData_d( char *to, int threads );
+extern int createData_l( char **list );
+extern int readData_d( const char *from, char *to_dir, int threads );
+extern int readData_l( char **list );
 
 /**
  * see if we have been told to change the number of threads we are running
