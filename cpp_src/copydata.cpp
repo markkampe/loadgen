@@ -72,12 +72,11 @@ static int isFile( const struct dirent *dp ) {
  * @param from		directory from which files came
  * @param to		directory under which files should be created
  * @param threads	number of initial threads
- * @param bsize		write block size
  *
  * @return		exit status (worst exiit status from any thread)
  */
 int 
-copyData( const char *from, char *to, int threads, int bsize ) {
+copyData( const char *from, char *to, int threads ) {
 
 	// make sure that our assigned working directory exists 
 	const char *err = checkdir(to, to);
@@ -123,7 +122,7 @@ copyData( const char *from, char *to, int threads, int bsize ) {
 			return RESOURCE_ERROR;
 		}
 
-		parms->block_size = bsize;
+		parms->block_size = loadgen_bsize;
 		parms->create_opts = loadgen_rewrite ? 0 : O_TRUNC|O_CREAT;
 		if (loadgen_sync)
 			parms->create_opts |= O_DSYNC;

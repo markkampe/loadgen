@@ -24,7 +24,7 @@
 #define	MAX_THREADS	100
 
 void *createDataThread( void * );
-int writeFile( const char *filename, char *buf, long bsize, struct writeParms *myparms, perfstats *stats );
+int writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstats *stats );
 
 /**
  * parameters for a data creation thread
@@ -34,6 +34,7 @@ struct writeParms {
 	int 		block_size;
 	long long	offset;
 	long long	file_length;
+	long long	bytes_to_write;
 	unsigned long	create_opts;
 	bool		single_file;
 
@@ -45,10 +46,11 @@ struct writeParms {
 	 * @param length	output file length
 	 * @param dir		name of directory to put files in
 	 */
-	writeParms( char *name, int bsize, long long length, const char *dir ) {
+	writeParms( char *name, int bsize, long long file_size, const char *dir ) {
 		// fill in the basic operation parameters
 		block_size = bsize;
-		file_length = length;
+		file_length = file_size;
+		bytes_to_write = 0;
 		to_directory = dir;
 		create_opts = O_CREAT;
 		if (!loadgen_rewrite)
@@ -71,14 +73,12 @@ struct writeParms {
  *
  * @param to		directory under which files should be created
  * @param threads	number of initial threads
- *			(if this is zero
- * @param bsize		write block size
- * @param length	desired file length
+ *			(if this is zero, don't start yet)
  *
  * @return		exit status (worst exiit status from any thread)
  */
 int 
-createData_d( char *to, int threads, int bsize, long long length ) {
+createData_d( char *to, int threads ) {
 
 	// if there is an offset, note it and null it out
 	long long offset = getOffset(to);
@@ -107,11 +107,11 @@ createData_d( char *to, int threads, int bsize, long long length ) {
 		struct writeParms *parms;
 		// come up with a target directory for this thread
 		if (onefile)
- 			parms = new writeParms( threadname, bsize, length, to );
+ 			parms = new writeParms( threadname, loadgen_bsize, loadgen_fsize, to );
 		else {
 			char *dir = 0;
 			asprintf( &dir, "%s/Thread%04d", to, i );
- 			parms = new writeParms( threadname, bsize, length, dir );
+ 			parms = new writeParms( threadname, loadgen_bsize, loadgen_fsize, dir );
 		}
 		
 		if (threadname == 0 || parms == 0) {
@@ -120,6 +120,7 @@ createData_d( char *to, int threads, int bsize, long long length ) {
 		}
 		parms->offset = offset;
 		parms->single_file = onefile;
+		parms->bytes_to_write = loadgen_data;
 		// FIX on shutdown we should reclaim threadname, to_directory
 	}
 	
@@ -134,13 +135,11 @@ createData_d( char *to, int threads, int bsize, long long length ) {
  *	spindles.
  *
  * @param list		list of directories under which to create files
- * @param bsize		write block size
- * @param length	desired file length
  *
  * @return		exit status (worst exiit status from any thread)
  */
 int 
-createData_l( char **list, int bsize, long long length ) {
+createData_l( char **list ) {
 
 	// create a work thread for each specified directory
 	int threads = 0;
@@ -168,7 +167,7 @@ createData_l( char **list, int bsize, long long length ) {
 		char *threadname = 0;
 		asprintf( &threadname, "Creator Thread %04d", i );
 
-		struct writeParms *parms = new writeParms( threadname, bsize, length, list[i] );
+		struct writeParms *parms = new writeParms( threadname, loadgen_bsize, loadgen_fsize, list[i] );
 		if (threadname == 0 || parms == 0) {
 			loadgen_problem = "malloc failure";
 			return RESOURCE_ERROR;
@@ -176,6 +175,7 @@ createData_l( char **list, int bsize, long long length ) {
 
 		parms->offset = offset;
 		parms->single_file = single_file;
+		parms->bytes_to_write = loadgen_data;
 		threads++;
 		// FIX on shutdown we should reclaim threadname, to_directory
 	}
@@ -198,9 +198,9 @@ void *createDataThread( void *sts ) {
 	// pick up ponter to my status structure
 	struct ThreadStatus *mystatus = (struct ThreadStatus *) sts;
 	struct writeParms *myparms = (struct writeParms *) mystatus->parms;
-	long bsize = myparms->block_size;
 	int alignment = loadgen_direct > 0 ? loadgen_direct : DEFAULT_ALIGNMENT;
 	int maxfiles = loadgen_maxfiles;
+	int bufsize = myparms->block_size;
 
 	// announce that we are starting up
 	mystatus->running = true;	// now set in manageThreads to avoid a race
@@ -223,21 +223,21 @@ void *createDataThread( void *sts ) {
 		maxfiles = 1;
 
 	// allocate and lock down a pattern data buffer
-	if (bsize == 0)
-		bsize = max_bsize();
-	if (posix_memalign( (void **) &data, alignment, bsize ) != 0) {
-		fprintf(stderr, "Unable to allocate (%ld byte) data buffer for %s\n",
-			bsize, mystatus->name );
+	if (bufsize == 0)
+		bufsize = max_bsize();
+	if (posix_memalign( (void **) &data, alignment, bufsize ) != 0) {
+		fprintf(stderr, "Unable to allocate (%d byte) data buffer for %s\n",
+			bufsize, mystatus->name );
 		status |= RESOURCE_ERROR;
 		loadgen_problem = "malloc failure";
 		goto exit;
 	}
-	mlock( data, bsize );
+	mlock( data, bufsize );
 
 	// initialize the run and thread headers and the data contents
 	runHeader( data, loadgen_tag );
 	threadHeader( data, myparms->to_directory );
-	fillData( data, bsize );
+	fillData( data, bufsize );
 
 	// create a succession of files
 	for( done = 0; status == 0 && mystatus->enable; done++ ) {
@@ -248,11 +248,6 @@ void *createDataThread( void *sts ) {
 		// see if we have hit the maximum # of files to create
 		if (maxfiles > 0 && done >= maxfiles)
 			break;
-
-		// come up with a block size
-		bsize = myparms->block_size;
-		if (bsize == 0)
-			bsize = choose_bsize( loadgen_direct, myparms->file_length );
 
 		// figure out the name of the next file 
 		if (!myparms->single_file) {
@@ -267,17 +262,17 @@ void *createDataThread( void *sts ) {
 				loadgen_problem = "malloc failure";
 				break;
 			}
-			status = writeFile( fullpath, data, bsize, myparms, &mystatus->stats );
+			status = writeFile( fullpath, data, myparms, &mystatus->stats );
 			free( fullpath );
 			fullpath = 0;
 		} else {
-			status = writeFile( myparms->to_directory, data, bsize, myparms, &mystatus->stats );
+			status = writeFile( myparms->to_directory, data, myparms, &mystatus->stats );
 		}
 	}
 
   	// free the pattern data buffer
 	if (data) {
-		munlock( data, bsize );
+		munlock( data, bufsize );
 		free( data );
 	}
 
@@ -295,7 +290,7 @@ void *createDataThread( void *sts ) {
 }
 
 int
-writeFile( const char *filename, char *buf, long bsize, struct writeParms *myparms, perfstats *stats ) {
+writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstats *stats ) {
 	// generate a fully qualified path and create the file
 	int fd = -1;
 	if (!loadgen_simulate) {
@@ -309,6 +304,11 @@ writeFile( const char *filename, char *buf, long bsize, struct writeParms *mypar
 		}
 	}
 
+	// come up with a block size
+	int bsize = myparms->block_size;
+	if (bsize == 0) {
+		bsize = choose_bsize( loadgen_direct, max_bsize() );
+	}
 	// come up with a file length
 	long long fsize = myparms->file_length;
 	if (loadgen_rewrite) { // use the size with which it was created
@@ -322,11 +322,13 @@ writeFile( const char *filename, char *buf, long bsize, struct writeParms *mypar
 	fileHeader( buf, filename, fsize );
 		
 	// figure out how much data to write
-	long long totbytes = myparms->file_length;
+	long long totbytes = myparms->bytes_to_write;
+	if (totbytes == 0)
+		totbytes = fsize;
 
 	// announce our intentions
 	if (loadgen_debug & D_FILES) 
-		fprintf(stderr, "# %s output file %s, bsize=%ld, length=%lld/%lld\n", 
+		fprintf(stderr, "# %s output file %s, bsize=%d, length=%lld/%lld\n", 
 			loadgen_rewrite ? "rewriting" : "creating",
 			filename, bsize, totbytes, fsize);
 
@@ -343,7 +345,7 @@ writeFile( const char *filename, char *buf, long bsize, struct writeParms *mypar
 		blockHeader( buf,  bsize, offset );
 
 		// do the write
-		int bytes = (loadgen_rand_blk) ? loadgen_rand_blk : bsize;
+		int bytes = (loadgen_rand_blk) ? loadgen_rand_blk : myparms->block_size;
 		status |= timed_write( fd, buf, bytes, stats, filename, offset );
 		len += bytes;
 

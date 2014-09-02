@@ -18,7 +18,7 @@
 
 	
 void *readThread( void * );
-int readFile( const char *filename, char *buf, int bufsize, long bsize, long long length, long long offset, perfstats *stats );
+int readFile( const char *filename, char *buf, int bufsize, int bsize, long long read_bytes, long long offset, perfstats *stats );
 void *compareThread( void * );
 
 /**
@@ -28,7 +28,7 @@ struct readParms {
 	const char *	from_directory;
 	const char *	to_directory;
 	int 		block_size;
-	long long	length;
+	long long	bytes_to_read;
 	long long	offset;
 	bool            one_file;
 
@@ -43,7 +43,7 @@ struct readParms {
 	readParms( char *name, int bsize, const char *src_dir, const char *cpy_dir ) {
 		// fill in the basic operation parameters
 		block_size = bsize;
-		length = 0LL;
+		bytes_to_read = 0LL;
 		offset = 0LL;
 		from_directory = src_dir;
 		to_directory = cpy_dir;
@@ -100,13 +100,11 @@ static int isFile( const struct dirent *dp ) {
  * @param from		directory from which files came
  * @param to		directory under which files should be created
  * @param threads	number of initial threads
- * @param bsize		write block size
- * @param length	maximum bytes to read
  *
  * @return		exit status (worst exiit status from any thread)
  */
 int 
-readData_d( const char *from, char *to, int threads, int bsize, long long length ) {
+readData_d( const char *from, char *to, int threads ) {
 
 	// make sure that our assigned working directory exists 
 	const char *err = checkdir(to, false);
@@ -155,13 +153,13 @@ readData_d( const char *from, char *to, int threads, int bsize, long long length
 			asprintf( &src, "%s/%s", from, results[i]->d_name );
 
 		// allocate and initialize a parameter structure
-		struct readParms *parms = new readParms( threadname, bsize, src, cpy );
+		struct readParms *parms = new readParms( threadname, loadgen_bsize, src, cpy );
 		if (threadname == 0 || cpy == 0 || parms == 0) {
 			fprintf(stderr, "FATAL: malloc failure\n");
 			loadgen_problem = "malloc failure";
 			return RESOURCE_ERROR;
 		}
-		parms->length = length;
+		parms->bytes_to_read = loadgen_data;
 
 		// and free up the dirent
 		free( results[i] );
@@ -183,13 +181,11 @@ readData_d( const char *from, char *to, int threads, int bsize, long long length
  * -	spawn off threads to read/verify specified files/directories
  *
  * @param list		list of directories to be verified
- * @param bsize		write block size
- * @param length	maximum bytes to read
  *
  * @return		exit status (worst exiit status from any thread)
  */
 int 
-readData_l( char **list, int bsize, long long length ) {
+readData_l( char **list ) {
 
 	// create a work thread for each specified directory
 	int threads = 0;
@@ -201,7 +197,7 @@ readData_l( char **list, int bsize, long long length ) {
 
 		// make sure the assigned working directory exists 
 		if (checkdev(list[i])) {
-			if (length == 0) {
+			if (loadgen_fsize == 0) {
 				fprintf(stderr, "FATAL: device %s requires length specified\n",
 					list[i] );
 				loadgen_problem = "target device w/o length";
@@ -226,7 +222,7 @@ readData_l( char **list, int bsize, long long length ) {
 		asprintf( &threadname, "Verifier Thread %04d", i );
 	
 		// allocate and initialize a parameter structure
-		struct readParms *parms = new readParms( threadname, bsize, 0, list[i] );
+		struct readParms *parms = new readParms( threadname, loadgen_bsize, 0, list[i] );
 		if (threadname == 0 || parms == 0) {
 			fprintf(stderr, "FATAL: malloc failure\n");
 			loadgen_problem = "malloc failure";
@@ -234,7 +230,7 @@ readData_l( char **list, int bsize, long long length ) {
 		}
 
 		// plug in a few additional parameters
-		parms->length = length;
+		parms->bytes_to_read = loadgen_data;
 		parms->offset = offset;
 		parms->one_file = single_file;
 
@@ -264,9 +260,9 @@ void *readThread( void *sts ) {
 	struct ThreadStatus *mystatus = (struct ThreadStatus *) sts;
 	struct readParms *myparms = (struct readParms *) mystatus->parms;
 	int alignment = loadgen_direct > 0 ? loadgen_direct : DEFAULT_ALIGNMENT;
-	long bsize = myparms->block_size;
-	if (bsize == 0)
-		bsize = max_bsize();
+	long bufsize = myparms->block_size;
+	if (bufsize == 0)
+		bufsize = max_bsize();
 
 	// announce that we are starting up
 	mystatus->running = true;	// now set in manageThreads to avoid a race
@@ -288,20 +284,20 @@ void *readThread( void *sts ) {
 	}
 
 	// allocate a read buffer
-	if (posix_memalign( (void **) &data, alignment, bsize ) != 0) {
+	if (posix_memalign( (void **) &data, alignment, bufsize ) != 0) {
 		fprintf(stderr, "Unable to allocate (%ld byte) data buffer for %s\n",
-			bsize, mystatus->name );
+			bufsize, mystatus->name );
 		status |= RESOURCE_ERROR;
 		loadgen_problem = "malloc failure";
 		goto exit;
 	}
-	mlock( data, bsize );
+	mlock( data, bufsize );
 
 	// find and verify each file in this directory
 	if (myparms->one_file) {
 		count = 0;
-		status = readFile( myparms->to_directory, data, bsize, 
-				myparms->block_size, myparms->length, myparms->offset,
+		status = readFile( myparms->to_directory, data, bufsize,
+				myparms->block_size, myparms->bytes_to_read, myparms->offset,
 				&mystatus->stats );
 		if (status == 0 && loadgen_delete) {
 			if (unlink( myparms->to_directory ) != 0) {
@@ -327,8 +323,8 @@ void *readThread( void *sts ) {
 		asprintf( &path, "%s/%s", myparms->to_directory, results[done]->d_name );
 		
 		// read (and verify) this file
-		status = readFile( path, data, bsize, 
-				myparms->block_size, myparms->length, myparms->offset, 
+		status = readFile( path, data, bufsize,
+				myparms->block_size, myparms->bytes_to_read, myparms->offset, 
 				&mystatus->stats );
 		if (status == 0) {
 			mystatus->stats.file_done();
@@ -357,7 +353,7 @@ void *readThread( void *sts ) {
 
   	// free stuff we allocated
 	if (data) {
-		munlock( data, bsize );
+		munlock( data, bufsize );
 		free( data );
 	}
 	if (results)
@@ -388,23 +384,21 @@ void *readThread( void *sts ) {
 }
 
 /**
- * readFile ... read (and verify) a single file
+ * readFile ... read (and verify) a single file (of pattern data)
  *
  * @param	file name to process
  * @param	input buffer (locked down and aligned)
  * @param	length of input buffer
  * @param	expected file block size (0 = no expectations)
- * @param 	number of bytes to read
- * @param	base (byte) offset
+ * @param 	total number of bytes to read
+ * @param	base (byte) offset for all I/O to this file
  * @param	stats structure to update
  *
  * @return	error mask
  */
 int readFile( const char *filename, char *inbuf, int bufsize, 
-		long bsize, long long length, long long base_offset,
+		int bsize, long long read_bytes, long long base_offset,
 		perfstats *stats ) {
-
-	long long file_size;
 
 	// open the file
 	int opts = loadgen_direct ? O_DIRECT : 0;
@@ -427,11 +421,9 @@ int readFile( const char *filename, char *inbuf, int bufsize,
 		return INPUT_FILE_ERROR;
 	}
 
-	// note the size of the file
-	file_size = get_file_size(inbuf);
-
-	// see if the headers seem well-formed 
-	if (loadgen_verify || bsize == 0 || length == 0) {
+	// check the headers and extract size information
+	long long file_size = 0;
+	if (loadgen_verify || bsize == 0 || file_size == 0) {
 		const char *err = checkHeaders( inbuf, bsize, 0ULL );
 		if (err) {
 			fprintf(stderr, 
@@ -446,17 +438,19 @@ int readFile( const char *filename, char *inbuf, int bufsize,
 		}
 
 		
-		// if we have no block size or length, use the header values
+		// default file and block sizes come from the headers
+		file_size = get_file_size(inbuf);
 		if (bsize == 0)
 			bsize = get_block_size( inbuf );
-		if (length == 0)
-			length = get_file_size(inbuf);
 	}
+	long long max_block = file_size/bsize;
+	if (read_bytes == 0)
+		read_bytes = file_size;
 
 	// make sure we have a reasonable block size
-	if (bsize == 0 || bsize > max_bsize()) {
+	if (bsize == 0 || bsize > max_bsize() || bsize > bufsize) {
 		fprintf(stderr,
-			"FATAL: file %s: illegal bsize (%ld): supported max (%ld)\n",
+			"FATAL: file %s: illegal bsize (%d): supported max (%ld)\n",
 			filename, bsize, max_bsize() );
 		loadgen_problem = "illegal block size";
 		close(fd);
@@ -476,19 +470,16 @@ int readFile( const char *filename, char *inbuf, int bufsize,
 		fprintf(stderr, "# Verify LENGTH for %s ... OK\n", filename );
 	}
 
-	// figure out how large the file is
-	long long bytes_to_read = length;
-	long long max_block = file_size/bsize;
 
 	if (loadgen_debug & D_FILES) {
-		fprintf(stderr, "# %sing file %s, using bsize=%ld\n", 
+		fprintf(stderr, "# %sing file %s, using bsize=%d\n", 
 			loadgen_verify ? "verify" : "read", filename, bsize );
 	}
 
 	long long offset = base_offset;
 	lseek( fd, offset, SEEK_SET );
 	int status = 0;
-	while( status == 0 && bytes_to_read > 0 ) {
+	while( status == 0 && read_bytes > 0 ) {
 		// figure out how much to read
 		int bytes = (loadgen_rand_blk == 0) ? bsize : loadgen_rand_blk;
 
@@ -525,7 +516,7 @@ int readFile( const char *filename, char *inbuf, int bufsize,
 		} 
 
 		// note that we have knocked off some of our quota
-		bytes_to_read -= bytes;
+		read_bytes -= bytes;
 
 		// and figure out where the next read should come from
 		if (loadgen_rand_blk) {
@@ -633,9 +624,11 @@ void *compareThread( void *sts ) {
 
 
 		// figure out what block size to use for the comparison
+		//	no smaller than the alignment
+		//	no greater than the file size
 		bsize = myparms->block_size;
 		if (bsize == 0)
-			bsize = choose_bsize( loadgen_direct, myparms->length );
+			bsize = choose_bsize( loadgen_direct, max_bsize() );
 
 		if (loadgen_debug & D_FILES) {
 			fprintf(stderr, "# compare file %s in %s to %s, bsize=%ld\n",
