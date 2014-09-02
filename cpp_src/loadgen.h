@@ -13,6 +13,7 @@ extern bool loadgen_zombie;	///< we are under remote control
 extern bool loadgen_once;	///< only one directory per thread
 extern int  loadgen_direct;	///< direct buffer alignment
 extern int  loadgen_rand_blk;	///< random access r/w block size
+extern long long loadgen_data;	///< amount of data to read or write
 extern long long loadgen_rate;	///< target generation rate
 extern int  loadgen_update;	///< performance update interval
 extern int  loadgen_maxfiles;	///< maximum number of files to create

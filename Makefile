@@ -69,6 +69,9 @@ JIMAGES := \
 HORDE := \
 	$(JSRCDIR)/horde.cfg
 
+$(CLASSDIR):
+	mkdir $@
+
 make_classes = \
 	$(addprefix $(CLASSDIR)/,$(patsubst %.java,%.class,$(notdir $(1))))
 
@@ -78,9 +81,6 @@ $(CLASSES): $(JSOURCES) classes $(JIMAGES)
 	$(JAVAC) -d $(CLASSDIR) $(JSOURCES)
 	cp $(JIMAGES) $(CLASSDIR)
 	cp $(HORDE) $(CLASSDIR)
-
-$(CLASSDIR):
-	mkdir $@
 
 #
 # If I were more clever and had a little more time I'd figure out how
@@ -98,13 +98,6 @@ ZombieMaster.jar: $(CLASSES) $(JIMAGES)
 DOCDIR := Docs
 %.html: $(DOCDIR)/%.1
 	groff -man -Thtml $^ > $@
-
-#loadgen.html: $(DOCDIR)/loadgen.1
-#	groff -man -Thtml $^ > $@
-#
-#zombiemaster.html: $(DOCDIR)/zombiemaster.1
-#	groff -man -Thtml $^ > $@
-
 
 .PHONY: test
 test:

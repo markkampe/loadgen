@@ -65,6 +65,7 @@ static struct myargs {
 	{"source",	'i',		"source directory (for copies)" },
 	{"bsize",	'b',		"write block size" },
 	{"length",	'l',		"file length" },
+	{"data",	'Z',		"bytes to read/write" },
 	{"maxfiles",	'M',		"maximum number of files to create" },
 	{"threads",	't',		"initial number of up-load threads" },
 	{"update",	'u',		"update interval" },
@@ -111,6 +112,7 @@ bool loadgen_sync = false;	///< synchronous writes
 bool loadgen_zombie = false;	///< under remote control
 bool loadgen_once = false;	///< only one directory per thread
 long long loadgen_rate = 0;	///< target write/read bandwidth
+long long loadgen_data = 0;	///< how much data to read or write
 int loadgen_update = 5;		///< statistics update interval in seconds
 int loadgen_maxfiles = 0;	///< maximum number of files to create
 const char *loadgen_tag = 0;		///< tag for this zombie
@@ -245,6 +247,10 @@ main( int argc, const char **argv) {
 			length = getSizeSpec( optarg );
 			continue;
 
+		    case 'Z':
+		    	loadgen_data = getSizeSpec( optarg );
+			continue;
+
 		    case 'b':
 			bsize = (int) getSizeSpec( optarg );
 			continue;
@@ -296,6 +302,7 @@ main( int argc, const char **argv) {
 		exit( -1 );
 	}
 
+
 	// define the latency reporting buckets (micro-seconds)
 	long limits[] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
 			1000, 2000, 4000, 8000, 16000, 32000, 
@@ -319,6 +326,8 @@ main( int argc, const char **argv) {
 		else
 			fprintf(stderr, "#   length   = random\n");
 
+		if (loadgen_data)
+			fprintf(stderr, "#   data     = %lld bytes\n", loadgen_data );
 		if (bsize)
 			fprintf(stderr, "#   bsize    = %d bytes\n", bsize );
 		else

@@ -13,6 +13,7 @@
 .BI [--bsize= # ]
 .BI [--direct= # ]
 .BI [--length= # ]
+.BI [--data= # ]
 .BI [--maxfiles= # ]
 .BI [--threads= # ]
 .BI [--rate= # ]
@@ -198,6 +199,12 @@ If no
 is specified, 
 .B loadgen
 will randomly select a different length for each file.
+.IP --data=
+This switch specifies how much data should be read from or written to each file.
+The number can be specified in bytes, or followed by a 'k', 'm', 'g', or 't'.
+For sequential reads and writes the amount of data read from/written to each
+file is equal to the length of the file.  For random I/O, the amount of data
+to be read or written can be greater or less than the size of the file. 
 .IP --maxfiles=
 Normally, in pattern data creation mode, 
 .B loadgen
