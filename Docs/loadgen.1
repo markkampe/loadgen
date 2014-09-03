@@ -18,6 +18,7 @@
 .BI [--threads= # ]
 .BI [--rate= # ]
 .BI [--random= # ]
+.BI [--depth= # ]
 .BI [--update= # ]
 .B [--read [--delete]]
 .B [--verify [--delete]]
@@ -245,6 +246,9 @@ changed during the course of the run.
 Note that if threads are running at large block
 size and maximum rates, it will probably be possible to saturate the 
 local NIC with only two or three threads.  
+.IP --depth=
+This switch enables asynchrnous I/O and specifies the number of concurrent
+reads/writes that should be kept outstanding.
 .IP --update=
 This switch controls the number of seconds between throughput report messages.
 The default value is one report every five seconds.

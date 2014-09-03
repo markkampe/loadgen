@@ -19,6 +19,7 @@ extern long long loadgen_data;	///< amount of data to read or write
 extern long long loadgen_rate;	///< target generation rate
 extern int  loadgen_update;	///< performance update interval
 extern int  loadgen_maxfiles;	///< maximum number of files to create
+extern int  loadgen_depth;	///< number of concurrent I/O operations
 extern const char *loadgen_tag;	///< output tag
 extern const char *loadgen_problem;	///< the problem that took us down
 

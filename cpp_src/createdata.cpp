@@ -34,6 +34,7 @@ int writeFile( const char *filename, char *buf, struct writeParms *myparms, perf
 struct writeParms {
 	const char *	to_directory;
 	int 		block_size;
+	int		aio_depth;
 	long long	offset;
 	long long	file_length;
 	long long	bytes_to_write;
@@ -123,6 +124,7 @@ createData_d( char *to, int threads ) {
 		parms->offset = offset;
 		parms->single_file = onefile;
 		parms->bytes_to_write = loadgen_data;
+		parms->aio_depth = loadgen_depth;
 		// FIX on shutdown we should reclaim threadname, to_directory
 	}
 	
@@ -178,6 +180,7 @@ createData_l( char **list ) {
 		parms->offset = offset;
 		parms->single_file = single_file;
 		parms->bytes_to_write = loadgen_data;
+		parms->aio_depth = loadgen_depth;
 		threads++;
 		// FIX on shutdown we should reclaim threadname, to_directory
 	}

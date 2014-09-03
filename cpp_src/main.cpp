@@ -71,6 +71,7 @@ static struct myargs {
 	{"update",	'u',		"update interval" },
 	{"rate",	'R',		"target bandwidth" },
 	{"direct",	'A',		"alignment" },
+	{"depth",	'a',		"concurrent ops" },
 	{"random",	'z',		"block size" },
 	{"read",	'r',		0	 },
 	{"verify",	'v',		0	 },
@@ -117,10 +118,11 @@ long long loadgen_fsize = 0;	///< size of each created file
 long long loadgen_data = 0;	///< how much data to read or write
 int loadgen_update = 5;		///< statistics update interval in seconds
 int loadgen_maxfiles = 0;	///< maximum number of files to create
-const char *loadgen_tag = 0;		///< tag for this zombie
-const char *loadgen_problem = 0;	///< the problem that shut us down
 int  loadgen_direct = 0;	///< direct buffer alignment
 int  loadgen_rand_blk = 0;	///< random access r/w block size
+int  loadgen_depth = 0;		///< number of concurrent I/O operations
+const char *loadgen_tag = 0;	///< tag for this zombie
+const char *loadgen_problem = 0;	///< the problem that shut us down
 
 /**
  * SIGHUP handler ... shut down the load generation
@@ -255,6 +257,10 @@ main( int argc, const char **argv) {
 			loadgen_bsize = (int) getSizeSpec( optarg );
 			continue;
 
+		    case 'a':
+		    	loadgen_depth = atoi( optarg );
+			continue;
+
 		    case 'D':
 		    	loadgen_debug = debugOpts(optarg);
 			continue;
@@ -341,6 +347,8 @@ main( int argc, const char **argv) {
 		if (loadgen_rand_blk)
 			fprintf(stderr, "#   random   = %d\n", loadgen_rand_blk );
 		fprintf(stderr, "#   direct   = %d\n", loadgen_direct );
+		if (loadgen_depth)
+			fprintf(stderr, "#   depth    = %d\n", loadgen_depth );
 		fprintf(stderr, "#   delete   = %s\n", loadgen_delete ? "true" : "false" );
 		fprintf(stderr, "#   sync     = %s\n", loadgen_sync ? "true" : "false" );
 		if (loadgen_rate > 0)

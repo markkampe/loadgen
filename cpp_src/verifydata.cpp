@@ -28,6 +28,7 @@ struct readParms {
 	const char *	from_directory;
 	const char *	to_directory;
 	int 		block_size;
+	int		aio_depth;
 	long long	bytes_to_read;
 	long long	offset;
 	bool            one_file;
@@ -160,6 +161,7 @@ readData_d( const char *from, char *to, int threads ) {
 			return RESOURCE_ERROR;
 		}
 		parms->bytes_to_read = loadgen_data;
+		parms->aio_depth = loadgen_depth;
 
 		// and free up the dirent
 		free( results[i] );
@@ -231,6 +233,7 @@ readData_l( char **list ) {
 
 		// plug in a few additional parameters
 		parms->bytes_to_read = loadgen_data;
+		parms->aio_depth = loadgen_depth;
 		parms->offset = offset;
 		parms->one_file = single_file;
 
