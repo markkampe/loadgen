@@ -347,7 +347,7 @@ main( int argc, const char **argv) {
 		if (loadgen_rand_blk)
 			fprintf(stderr, "#   random   = %d\n", loadgen_rand_blk );
 		fprintf(stderr, "#   direct   = %d\n", loadgen_direct );
-		if (loadgen_depth)
+		if (loadgen_depth > 1)
 			fprintf(stderr, "#   depth    = %d\n", loadgen_depth );
 		fprintf(stderr, "#   delete   = %s\n", loadgen_delete ? "true" : "false" );
 		fprintf(stderr, "#   sync     = %s\n", loadgen_sync ? "true" : "false" );
@@ -540,7 +540,7 @@ read_args() {
 	fprintf(stdout, "loadgen (tag=%s): %s\n", loadgen_tag, herald );
 	fflush(stdout);
 
-#define	MAX_LINE 256
+#define	MAX_LINE 512
 	char *inbuf = (char *) malloc(MAX_LINE);	// memory leak
 	if (inbuf == 0)
 		return( 0 );

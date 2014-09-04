@@ -24,7 +24,8 @@ CSOURCES := \
 	command.cpp		\
 	pattern.cpp		\
 	timedio.cpp		\
-	checkdir.cpp
+	checkdir.cpp		\
+	bufset.cpp
 
 make_objs = \
 	$(addprefix $(OBJDIR)/,$(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(1))))

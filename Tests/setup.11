@@ -1,0 +1,9 @@
+#!/bin/bash
+
+test=$1
+TESTDIR=$2
+
+for i in 1 2 3 4
+do
+	touch $TESTDIR/asyfile$i
+done

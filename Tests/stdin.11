@@ -1,0 +1,2 @@
+--tag=test_tag --target=TESTDIR/asyfile1,TESTDIR/asyfile2,TESTDIR/asyfile3,TESTDIR/asyfile4 --rewrite --bsize=4k --random=4k --length=128k --data=1m --depth=16 --rate=256k --update=1 --debug=OC
+d

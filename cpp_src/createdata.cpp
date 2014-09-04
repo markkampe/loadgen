@@ -1,5 +1,4 @@
 #include <stdio.h>
-/* #define	_XOPEN_SOURCE	600 */
 #include <stdlib.h>
 #include <malloc.h>
 #include <unistd.h>
@@ -10,11 +9,11 @@
 #include <sys/ioctl.h>
 #include <linux/fs.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 
 #include "loadgen.h"
 #include "threadstatus.h"
 #include "pattern.h"
+#include "bufset.h"
 #include "debug.h"
 
 // maximum number of discrete threads (for manual creation)
@@ -26,20 +25,24 @@
 #define	MAX_THREADS	100
 
 void *createDataThread( void * );
-int writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstats *stats );
+int writeFile( const char *filename, Bufset *bufs, struct writeParms *myparms, perfstats *stats );
+int singleWrite(const char *filename, Bufset *bufs, struct writeParms *parms, int fd, perfstats *stats);
 
 /**
  * parameters for a data creation thread
  */
 struct writeParms {
-	const char *	to_directory;
-	int 		block_size;
-	int		aio_depth;
-	long long	offset;
-	long long	file_length;
-	long long	bytes_to_write;
-	unsigned long	create_opts;
-	bool		single_file;
+	// whole thread parameters
+	const char *	to_directory;		// all work will be done here
+	unsigned long	create_opts;		// truncate?
+	bool		single_file;		// do one file and then exit
+	long long	offset;			// base offset for all file I/O
+	int		aio_depth;		// depth for AIO requests
+
+	// per file parameters
+	int 		block_size;		// size of all writes
+	long long	file_length;		// maximum allowable file size
+	long long	bytes_to_write;		// total number of bytes to write
 
 	/**
 	 * allocate and initialize a write operation descriptor.
@@ -124,7 +127,7 @@ createData_d( char *to, int threads ) {
 		parms->offset = offset;
 		parms->single_file = onefile;
 		parms->bytes_to_write = loadgen_data;
-		parms->aio_depth = loadgen_depth;
+		parms->aio_depth = (loadgen_depth > 0) ? loadgen_depth : 1;
 		// FIX on shutdown we should reclaim threadname, to_directory
 	}
 	
@@ -180,7 +183,7 @@ createData_l( char **list ) {
 		parms->offset = offset;
 		parms->single_file = single_file;
 		parms->bytes_to_write = loadgen_data;
-		parms->aio_depth = loadgen_depth;
+		parms->aio_depth = (loadgen_depth > 0) ? loadgen_depth : 1;
 		threads++;
 		// FIX on shutdown we should reclaim threadname, to_directory
 	}
@@ -198,14 +201,15 @@ createData_l( char **list ) {
 void *createDataThread( void *sts ) {
 	int status = 0;		// this thread's exit status
 	int done = 0;		// number of files created
-	char *data = 0;		// the buffer we write from
+	Bufset *bufset = 0;	// write buffer set
 
-	// pick up ponter to my status structure
 	struct ThreadStatus *mystatus = (struct ThreadStatus *) sts;
 	struct writeParms *myparms = (struct writeParms *) mystatus->parms;
 	int alignment = loadgen_direct > 0 ? loadgen_direct : DEFAULT_ALIGNMENT;
 	int maxfiles = loadgen_maxfiles;
 	int bufsize = myparms->block_size;
+	int num_buf = myparms->aio_depth;
+
 
 	// announce that we are starting up
 	mystatus->running = true;	// now set in manageThreads to avoid a race
@@ -227,22 +231,26 @@ void *createDataThread( void *sts ) {
 	} else
 		maxfiles = 1;
 
-	// allocate and lock down a pattern data buffer
+	// allocate and lock down pattern data buffer(s)
 	if (bufsize == 0)
 		bufsize = max_bsize();
-	if (posix_memalign( (void **) &data, alignment, bufsize ) != 0) {
-		fprintf(stderr, "Unable to allocate (%d byte) data buffer for %s\n",
-			bufsize, mystatus->name );
+	bufset = new Bufset( num_buf, bufsize, alignment );
+	if (bufset->buffers == 0) {
+		fprintf(stderr, "Unable to allocate (%d %d byte) data buffer for %s\n",
+			num_buf, bufsize, mystatus->name );
 		status |= RESOURCE_ERROR;
 		loadgen_problem = "malloc failure";
 		goto exit;
 	}
-	mlock( data, bufsize );
 
 	// initialize the run and thread headers and the data contents
-	runHeader( data, loadgen_tag );
-	threadHeader( data, myparms->to_directory );
-	fillData( data, bufsize );
+	for( int i = 0; i < num_buf; i++) {
+		char *b = bufset->buffer(i);
+		runHeader( b, loadgen_tag );
+		threadHeader( b, myparms->to_directory );
+		fillData( b, bufsize );
+	}
+
 
 	// create a succession of files
 	for( done = 0; status == 0 && mystatus->enable; done++ ) {
@@ -267,19 +275,16 @@ void *createDataThread( void *sts ) {
 				loadgen_problem = "malloc failure";
 				break;
 			}
-			status = writeFile( fullpath, data, myparms, &mystatus->stats );
+			status = writeFile( fullpath, bufset, myparms, &mystatus->stats );
 			free( fullpath );
 			fullpath = 0;
 		} else {
-			status = writeFile( myparms->to_directory, data, myparms, &mystatus->stats );
+			status = writeFile( myparms->to_directory, bufset, myparms, &mystatus->stats );
 		}
 	}
 
-  	// free the pattern data buffer
-	if (data) {
-		munlock( data, bufsize );
-		free( data );
-	}
+  	// free the pattern data buffers
+	delete bufset;
 
   exit:	
 	// update my exit status and exit
@@ -294,8 +299,14 @@ void *createDataThread( void *sts ) {
 	pthread_exit(0);
 }
 
+/*
+ * create a file, choose a size, and write it
+ */
 int
-writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstats *stats ) {
+writeFile( const char *filename, 		// output file to create
+	Bufset *bufs,				// output buffers to use
+	struct writeParms *myparms, 		// test parameters
+	perfstats *stats ) {			// performance counters
 	// generate a fully qualified path and create the file
 	int fd = -1;
 	if (!loadgen_simulate) {
@@ -309,69 +320,98 @@ writeFile( const char *filename, char *buf, struct writeParms *myparms, perfstat
 		}
 	}
 
+	// create a local (this test only) parameter set
+	struct writeParms parms = *myparms;
+
 	// come up with a block size
-	int bsize = myparms->block_size;
-	if (bsize == 0) {
-		bsize = choose_bsize( loadgen_direct, max_bsize() );
+	if (parms.block_size == 0) {
+		parms.block_size = choose_bsize( loadgen_direct, bufs->size );
 	}
 
 	// come up with a file length
 	unsigned long long fsize = myparms->file_length;
-	if (fsize == 0) {
+	if (parms.file_length == 0) {
 		struct stat statb;
 		fstat( fd, &statb );
 		if (S_ISREG(statb.st_mode) && statb.st_size > 0) {
 			// existing file ... use current length
-			fsize = statb.st_size;
+			parms.file_length = statb.st_size;
 		} else if (S_ISBLK(statb.st_mode) || S_ISCHR(statb.st_mode)) {
-			ioctl(fd, BLKGETSIZE64, &fsize);
+			ioctl(fd, BLKGETSIZE64, &parms.file_length);
 		} 
 	}
-	if (fsize == 0)
-		fsize = choose_file_size( bsize );	// choose a random length
 
-	// now create a header for that size
-	fileHeader( buf, filename, fsize );
+	// come up with a file length
+	if (parms.file_length == 0)
+		parms.file_length = choose_file_size( parms.block_size );
+
+	// now create header(s) for the chosen file size
+	for( int i = 0; i < bufs->buffers; i++ ) {
+		fileHeader( bufs->buffer(i), filename, parms.file_length );
+	}
 		
 	// figure out how much data to write
-	long long totbytes = myparms->bytes_to_write;
-	if (totbytes == 0)
-		totbytes = fsize;
+	if (parms.bytes_to_write == 0)
+		parms.bytes_to_write = fsize;
 
 	// announce our intentions
 	if (loadgen_debug & D_FILES) 
-		fprintf(stderr, "# %s output file %s, bsize=%d, fsize=%lld/%lld\n", 
+		fprintf(stderr, "# %s output file %s, bsize=%d, depth=%d, fsize=%lld/%lld\n", 
 			loadgen_rewrite ? "rewriting" : "creating",
-			filename, bsize, totbytes, fsize);
+			filename, parms.block_size, parms.aio_depth, parms.bytes_to_write, parms.file_length);
 
 	// fill it full of data
-	stats->file_done();
-	long long len = 0;
+	stats->file_done();	// bump the file count
+	int status;
+	// FIX .. AIO depth=
+	status = singleWrite(filename, bufs, &parms, fd,  stats);
+
+	// close the file and free its name
+	if (!loadgen_simulate)
+		close( fd );
+
+	return( status );
+}
+
+/*
+ * synchronous writes
+ *
+ * @param	name of output file (for logging)
+ * @param	Bufset for the pattern data write buffers
+ * @param	writeParms for this file
+ * @param	open write file descriptor
+ * @param	perfstats structure to accumulate results
+ *
+ * @return	status
+ */
+int singleWrite(const char *filename,
+		Bufset *bufs,
+		struct writeParms *parms,
+		int fd,
+		perfstats *stats) {
 	int status = 0;
-	long long offset = myparms->offset;
-	if (offset != 0)
-		lseek( fd, offset, SEEK_SET );
-	
-	while( len < totbytes && status == 0 ) {
+	long long len = 0;
+	long long offset = parms->offset;
+	char *buf = bufs->buffer(0);
+
+	lseek( fd, offset, SEEK_SET );
+	while( len < parms->bytes_to_write && status == 0 ) {
 		// update the header for the next block
-		blockHeader( buf,  bsize, offset );
+		blockHeader( buf,  parms->block_size, offset );
 
 		// do the write
-		int bytes = (loadgen_rand_blk) ? loadgen_rand_blk : myparms->block_size;
+		int bytes = (loadgen_rand_blk) ? loadgen_rand_blk : parms->block_size;
 		status |= timed_write( fd, buf, bytes, stats, filename, offset );
 		len += bytes;
 
 		// see if we should do a seek
 		if (loadgen_rand_blk && loadgen_rewrite) {
-			offset = myparms->offset + choose_block( fsize/bsize ) * bsize;
+			long long maxblk = parms->file_length / parms->block_size;
+			offset = parms->offset + choose_block( maxblk ) * parms->block_size;
 			lseek( fd, offset, SEEK_SET );
 		} else
 			offset += bytes;
 	}
-
-	// close the file and free its name
-	if (!loadgen_simulate)
-		close( fd );
 
 	return( status );
 }
